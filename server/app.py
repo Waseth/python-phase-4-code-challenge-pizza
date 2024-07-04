@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 from models import db, Restaurant, RestaurantPizza, Pizza
@@ -12,28 +12,31 @@ app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.json.compact = False
-
+#initialisation of db and migration
 migrate = Migrate(app, db)
 
 db.init_app(app)
-
+#init flask restful Api
 api = Api(app)
 
 # Add RestaurantsResource route
 class RestaurantsResource(Resource):
     def get(self):
+        """Retrieve all restaurants."""
         restaurants = Restaurant.query.all()
         return jsonify([restaurant.to_dict(only=('id', 'name', 'address')) for restaurant in restaurants])
 # Add RestaurantResource route
 class RestaurantResource(Resource):
     #implementation of get functionality
     def get(self, id):
+        """Get one restaurant by ID."""
         restaurant = Restaurant.query.get(id)
         if restaurant is None:
             return {"error": "Restaurant not found"}, 404
-        return jsonify(restaurant.to_dict(only=('id', 'name', 'address')))
+        return jsonify(restaurant.to_dict(only=('id', 'name', 'address', 'restaurant_pizzas')))
     #implementation of delete functionality
     def delete(self, id):
+        """Delete restaurants"""
         restaurant = Restaurant.query.get(id)
         if restaurant is None:
             return {"error": "Restaurant not found"}, 404
@@ -44,6 +47,7 @@ class RestaurantResource(Resource):
 # Add PizzasResource route
 class PizzasResource(Resource):
     def get(self):
+        """Retrieve pizzas."""
         pizzas = Pizza.query.all()
         return jsonify([pizza.to_dict(only=('id', 'name', 'ingredients')) for pizza in pizzas])
 
@@ -52,6 +56,7 @@ class PizzasResource(Resource):
 class RestaurantPizzasResource(Resource):
     # implementation of post functionality
     def post(self):
+        """Create a new restaurant-pizza relationship."""
         data = request.get_json()
         try:
             new_restaurant_pizza = RestaurantPizza(
@@ -63,6 +68,8 @@ class RestaurantPizzasResource(Resource):
             db.session.commit()
             return jsonify(new_restaurant_pizza.to_dict()), 201
         except Exception as e:
+            db.session.rollback()  # Rollback the session when there is an error
+            print(e)  # print the exception
             return {"errors": ["validation errors"]}, 400
 # Real addition of the routes
 api.add_resource(RestaurantsResource, '/restaurants')
